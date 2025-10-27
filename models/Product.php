@@ -1,249 +1,79 @@
 <?php
+require_once __DIR__ . '/../repositories/RepositoryManager.php';
+
 class Product extends Model {
     protected $table = 'products';
+    private $repository;
+    
+    public function __construct() {
+        parent::__construct();
+        $this->repository = RepositoryManager::getProductRepository();
+    }
     
     public function getFeaturedProducts($limit = 8) {
-        // Sanitize limit to prevent SQL injection
-        $limit = (int)$limit;
-        if ($limit <= 0) $limit = 8;
-        
-        $stmt = $this->db->prepare("
-            SELECT p.*, c.name as category_name, c.icon as category_icon,
-                   u.name as owner_name, u.city as owner_city, u.state as owner_state,
-                   AVG(r.rating) as average_rating,
-                   COUNT(r.id) as review_count
-            FROM {$this->table} p
-            LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN users u ON p.user_id = u.id
-            LEFT JOIN reviews r ON p.id = r.product_id
-            WHERE p.is_available = 1
-            GROUP BY p.id
-            ORDER BY p.views_count DESC, p.created_at DESC
-            LIMIT {$limit}
-        ");
-        $stmt->execute();
-        return $stmt->fetchAll();
+        return $this->repository->getFeaturedProducts($limit);
     }
     
     public function searchProducts($filters = [], $limit = 20, $offset = 0) {
-        $sql = "
-            SELECT p.*, c.name as category_name, c.icon as category_icon,
-                   u.name as owner_name, u.city as owner_city, u.state as owner_state,
-                   AVG(r.rating) as average_rating,
-                   COUNT(r.id) as review_count
-            FROM {$this->table} p
-            LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN users u ON p.user_id = u.id
-            LEFT JOIN reviews r ON p.id = r.product_id
-            WHERE p.is_available = 1
-        ";
-        
-        $params = [];
-        
-        if (!empty($filters['search'])) {
-            $sql .= " AND (p.title LIKE ? OR p.description LIKE ? OR p.brand LIKE ?)";
-            $searchTerm = '%' . $filters['search'] . '%';
-            $params[] = $searchTerm;
-            $params[] = $searchTerm;
-            $params[] = $searchTerm;
-        }
-        
-        if (!empty($filters['category'])) {
-            $sql .= " AND p.category_id = ?";
-            $params[] = $filters['category'];
-        }
-        
-        if (!empty($filters['min_price'])) {
-            $sql .= " AND p.daily_price >= ?";
-            $params[] = $filters['min_price'];
-        }
-        
-        if (!empty($filters['max_price'])) {
-            $sql .= " AND p.daily_price <= ?";
-            $params[] = $filters['max_price'];
-        }
-        
-        if (!empty($filters['city'])) {
-            $sql .= " AND u.city LIKE ?";
-            $params[] = '%' . $filters['city'] . '%';
-        }
-        
-        if (!empty($filters['condition'])) {
-            $sql .= " AND p.condition_status = ?";
-            $params[] = $filters['condition'];
-        }
-        
-        if (!empty($filters['brand'])) {
-            $sql .= " AND p.brand = ?";
-            $params[] = $filters['brand'];
-        }
-        
-        $sql .= " GROUP BY p.id";
-        
-        // Order by
-        $orderBy = $filters['sort'] ?? 'newest';
-        switch ($orderBy) {
-            case 'price_low':
-                $sql .= " ORDER BY p.daily_price ASC";
-                break;
-            case 'price_high':
-                $sql .= " ORDER BY p.daily_price DESC";
-                break;
-            case 'rating':
-                $sql .= " ORDER BY average_rating DESC";
-                break;
-            case 'popular':
-                $sql .= " ORDER BY p.views_count DESC";
-                break;
-            default:
-                $sql .= " ORDER BY p.created_at DESC";
-        }
-        
-        // Sanitize limit and offset to prevent SQL injection
-        $limit = (int)$limit;
-        $offset = (int)$offset;
-        if ($limit <= 0) $limit = 20;
-        if ($offset < 0) $offset = 0;
-        
-        $sql .= " LIMIT {$limit} OFFSET {$offset}";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll();
+        return $this->repository->searchProducts($filters, $limit, $offset);
     }
     
     public function countSearchResults($filters = []) {
-        $sql = "
-            SELECT COUNT(DISTINCT p.id) as total
-            FROM {$this->table} p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.is_available = 1
-        ";
-        
-        $params = [];
-        
-        if (!empty($filters['search'])) {
-            $sql .= " AND (p.title LIKE ? OR p.description LIKE ? OR p.brand LIKE ?)";
-            $searchTerm = '%' . $filters['search'] . '%';
-            $params[] = $searchTerm;
-            $params[] = $searchTerm;
-            $params[] = $searchTerm;
-        }
-        
-        if (!empty($filters['category'])) {
-            $sql .= " AND p.category_id = ?";
-            $params[] = $filters['category'];
-        }
-        
-        if (!empty($filters['min_price'])) {
-            $sql .= " AND p.daily_price >= ?";
-            $params[] = $filters['min_price'];
-        }
-        
-        if (!empty($filters['max_price'])) {
-            $sql .= " AND p.daily_price <= ?";
-            $params[] = $filters['max_price'];
-        }
-        
-        if (!empty($filters['city'])) {
-            $sql .= " AND u.city LIKE ?";
-            $params[] = '%' . $filters['city'] . '%';
-        }
-        
-        if (!empty($filters['condition'])) {
-            $sql .= " AND p.condition_status = ?";
-            $params[] = $filters['condition'];
-        }
-        
-        if (!empty($filters['brand'])) {
-            $sql .= " AND p.brand = ?";
-            $params[] = $filters['brand'];
-        }
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        $result = $stmt->fetch();
-        return $result['total'];
+        return $this->repository->countSearchResults($filters);
     }
     
     public function getProductDetails($id) {
-        $stmt = $this->db->prepare("
-            SELECT p.*, c.name as category_name, c.icon as category_icon,
-                   u.name as owner_name, u.city as owner_city, u.state as owner_state,
-                   u.phone as owner_phone, u.profile_image as owner_image,
-                   AVG(r.rating) as average_rating,
-                   COUNT(r.id) as review_count
-            FROM {$this->table} p
-            LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN users u ON p.user_id = u.id
-            LEFT JOIN reviews r ON p.id = r.product_id
-            WHERE p.id = ?
-            GROUP BY p.id
-        ");
-        $stmt->execute([$id]);
-        return $stmt->fetch();
+        return $this->repository->getProductDetails($id);
     }
     
     public function getSimilarProducts($productId, $categoryId, $limit = 4) {
-        // Sanitize limit to prevent SQL injection
-        $limit = (int)$limit;
-        if ($limit <= 0) $limit = 4;
-        
-        $stmt = $this->db->prepare("
-            SELECT p.*, c.name as category_name,
-                   u.name as owner_name, u.city as owner_city, u.state as owner_state,
-                   AVG(r.rating) as average_rating,
-                   COUNT(r.id) as review_count
-            FROM {$this->table} p
-            LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN users u ON p.user_id = u.id
-            LEFT JOIN reviews r ON p.id = r.product_id
-            WHERE p.id != ? AND p.category_id = ? AND p.is_available = 1
-            GROUP BY p.id
-            ORDER BY p.views_count DESC
-            LIMIT {$limit}
-        ");
-        $stmt->execute([$productId, $categoryId]);
-        return $stmt->fetchAll();
+        return $this->repository->getSimilarProducts($productId, $categoryId, $limit);
     }
     
     public function getAllBrands() {
-        $stmt = $this->db->prepare("
-            SELECT DISTINCT brand 
-            FROM {$this->table} 
-            WHERE brand IS NOT NULL AND brand != '' 
-            ORDER BY brand
-        ");
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+        return $this->repository->getAllBrands();
     }
     
     public function incrementViews($id) {
-        $stmt = $this->db->prepare("UPDATE {$this->table} SET views_count = views_count + 1 WHERE id = ?");
-        return $stmt->execute([$id]);
+        return $this->repository->incrementViews($id);
     }
     
     public function getUserProducts($userId) {
-        $stmt = $this->db->prepare("
-            SELECT p.*, c.name as category_name, c.icon as category_icon,
-                   COUNT(r.id) as rental_count,
-                   SUM(r.subtotal) as total_earnings
-            FROM {$this->table} p
-            LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN rentals r ON p.id = r.product_id AND r.owner_id = ? AND r.status = 'completed'
-            WHERE p.user_id = ?
-            GROUP BY p.id
-            ORDER BY p.created_at DESC
-        ");
-        $stmt->execute([$userId, $userId]);
-        return $stmt->fetchAll();
+        return $this->repository->getUserProducts($userId);
     }
     
     public function countUserProducts($userId) {
-        $stmt = $this->db->prepare("SELECT COUNT(*) as total FROM {$this->table} WHERE user_id = ?");
-        $stmt->execute([$userId]);
-        $result = $stmt->fetch();
-        return $result['total'];
+        return $this->repository->countUserProducts($userId);
+    }
+    
+    // Métodos adicionais usando o repository
+    public function updateAvailability($id, $isAvailable) {
+        return $this->repository->updateAvailability($id, $isAvailable);
+    }
+    
+    public function getProductsByCategory($categoryId, $limit = 20, $offset = 0) {
+        return $this->repository->getProductsByCategory($categoryId, $limit, $offset);
+    }
+    
+    // Métodos CRUD básicos usando o repository
+    public function find($id) {
+        return $this->repository->findById($id);
+    }
+    
+    public function create($data) {
+        return $this->repository->create($data);
+    }
+    
+    public function update($id, $data) {
+        return $this->repository->update($id, $data);
+    }
+    
+    public function delete($id) {
+        return $this->repository->delete($id);
+    }
+    
+    public function findAll($conditions = [], $limit = null, $offset = null) {
+        return $this->repository->findAll($limit, $offset);
     }
 }
 ?>
