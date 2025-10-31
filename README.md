@@ -22,11 +22,26 @@ Aplicação PHP (MVC simples) com páginas server-rendered, MySQL e assets está
 - TailwindCSS (CDN) e Font Awesome
 
 ## Funcionalidades
+- Autenticação: login e logout
+- Cadastro de usuário
+- Recuperação/Reset de senha (fluxo básico)
+- Edição de perfil e avatar
 - Catálogo com filtros, paginação e ordenação
-- Página de produto com galeria e reservas
-- Dashboard do usuário para cadastrar/editar produtos
+- Busca por nome/categoria
+- Página de produto com galeria de imagens
+- Publicação de produtos para aluguel
+- Edição e remoção de produtos
 - Upload de múltiplas imagens por produto
-- Chat entre usuários
+- Preço, disponibilidade e regras de aluguel
+- Processo de reserva/checkout de aluguel
+- Confirmação e resumo da reserva
+- Minhas locações (histórico e status)
+- Chat em tempo real entre usuários
+- Avaliações e comentários pós-aluguel
+- Página institucional: sobre, termos, contato, FAQ
+- Painel (dashboard) do usuário
+- Logs básicos de aplicação
+- Rotas e segurança (CSRF/sanitização básica)
 
 ## Estrutura do Projeto
 ```
@@ -40,6 +55,19 @@ views/            # templates PHP (layouts + páginas)
 ```
 
 ## Comece Rápido
+### Instalação Automática (recomendado)
+1. Execute o instalador via PHP CLI:
+```
+php scripts/install.php
+```
+2. Siga as instruções no terminal (host, banco, usuário e senha). Opcionalmente aplique dados de exemplo.
+3. Inicie o servidor embutido do PHP:
+```
+php -S localhost:8000 -t .
+```
+4. Acesse `http://localhost:8000`.
+
+### Instalação Manual
 1. Banco de dados
 ```
 mysql -u root -p < scripts/database_setup.sql
